@@ -1,0 +1,285 @@
+@import "tailwindcss";
+
+/*
+  Capsule design system — light medical, soft glassmorphism
+  Primary: #5D99A6 | Secondary: #6E878D
+*/
+
+:root {
+  --capsule-primary: #5d99a6;
+  --capsule-primary-hover: #6faab7;
+  --capsule-primary-soft: rgba(93, 153, 166, 0.12);
+  --capsule-primary-muted: rgba(93, 153, 166, 0.55);
+  --capsule-secondary: #6e878d;
+  --capsule-secondary-soft: rgba(110, 135, 141, 0.2);
+
+  --capsule-bg: #eef3f5;
+  --capsule-bg-elevated: #f8fafb;
+  --capsule-bg-gradient-mid: rgba(200, 220, 228, 0.45);
+
+  --capsule-text: #3d4f54;
+  --capsule-text-muted: #6e878d;
+  --capsule-text-subtle: rgba(61, 79, 84, 0.72);
+
+  --capsule-border: rgba(110, 135, 141, 0.32);
+  --capsule-border-strong: rgba(110, 135, 141, 0.45);
+
+  --capsule-glass-bg: rgba(255, 255, 255, 0.58);
+  --capsule-glass-shadow: 0 4px 28px rgba(93, 153, 166, 0.09);
+  --capsule-glass-shadow-lg: 0 8px 40px rgba(93, 153, 166, 0.1);
+
+  --capsule-success: #7aab8c;
+  --capsule-success-soft: rgba(122, 171, 140, 0.2);
+  --capsule-warning: #c9a66e;
+  --capsule-warning-soft: rgba(201, 166, 110, 0.22);
+  --capsule-danger: #c98a8a;
+  --capsule-danger-soft: rgba(201, 138, 138, 0.2);
+  --capsule-pending: #7eb0bc;
+  --capsule-pending-soft: rgba(126, 176, 188, 0.22);
+
+  --radius-sm: 0.625rem;
+  --radius-md: 0.875rem;
+  --radius-lg: 1.125rem;
+  --radius-xl: 1.375rem;
+}
+
+@theme inline {
+  --color-capsule-primary: var(--capsule-primary);
+  --color-capsule-primary-hover: var(--capsule-primary-hover);
+  --color-capsule-secondary: var(--capsule-secondary);
+  --color-capsule-bg: var(--capsule-bg);
+  --color-capsule-elevated: var(--capsule-bg-elevated);
+  --color-capsule-text: var(--capsule-text);
+  --color-capsule-text-muted: var(--capsule-text-muted);
+  --color-capsule-success: var(--capsule-success);
+  --color-capsule-warning: var(--capsule-warning);
+  --color-capsule-danger: var(--capsule-danger);
+  --color-capsule-pending: var(--capsule-pending);
+  --font-sans: var(--font-geist-sans), var(--font-arabic), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+/* Tajawal for all UI text when Arabic is active (overrides Geist-first stack). */
+html[lang="ar"] {
+  --font-sans: var(--font-arabic), "Segoe UI", Tahoma, sans-serif;
+}
+
+html {
+  min-height: 100%;
+  background-color: var(--capsule-bg);
+  background-image:
+    radial-gradient(
+      ellipse 100% 80% at 50% -15%,
+      var(--capsule-bg-gradient-mid),
+      transparent 52%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 100% 0%,
+      rgba(93, 153, 166, 0.06),
+      transparent 45%
+    ),
+    radial-gradient(
+      ellipse 60% 40% at 0% 100%,
+      rgba(110, 135, 141, 0.05),
+      transparent 50%
+    );
+  background-attachment: fixed;
+}
+
+html[lang="ar"] body {
+  font-family: var(--font-arabic), "Segoe UI", Tahoma, system-ui, sans-serif;
+}
+
+body {
+  background: transparent;
+  color: var(--capsule-text);
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+::selection {
+  background: rgba(93, 153, 166, 0.28);
+  color: var(--capsule-text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--capsule-primary);
+  outline-offset: 2px;
+}
+
+/* —— Design system utilities (use across app) —— */
+
+@layer components {
+  /* Arabic UI (Tajawal via next/font --font-arabic) */
+  .font-arabic {
+    font-family: var(--font-arabic), Tahoma, sans-serif;
+  }
+
+  .capsule-page-title {
+    @apply text-3xl font-semibold tracking-tight text-capsule-text;
+  }
+
+  .capsule-section-title {
+    @apply mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-capsule-text-muted;
+  }
+
+  .capsule-muted {
+    @apply text-capsule-text-muted;
+  }
+
+  .capsule-glass-panel {
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--capsule-border);
+    background: var(--capsule-glass-bg);
+    box-shadow: var(--capsule-glass-shadow);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+
+  .capsule-glass-panel--tight {
+    @apply p-6 sm:p-8;
+  }
+
+  .capsule-btn-primary {
+    @apply inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition;
+    background-color: var(--capsule-primary);
+    box-shadow: 0 2px 12px rgba(93, 153, 166, 0.28);
+  }
+
+  .capsule-btn-primary:hover:not(:disabled) {
+    background-color: var(--capsule-primary-hover);
+    box-shadow: 0 4px 18px rgba(93, 153, 166, 0.35);
+  }
+
+  .capsule-btn-primary:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+
+  .capsule-btn-secondary {
+    @apply inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-capsule-secondary/35 bg-transparent px-5 py-2.5 text-sm font-medium text-capsule-text transition;
+  }
+
+  .capsule-btn-secondary:hover:not(:disabled) {
+    background-color: var(--capsule-primary-soft);
+    border-color: rgba(110, 135, 141, 0.5);
+  }
+
+  .capsule-input {
+    @apply mt-1.5 w-full rounded-[var(--radius-md)] border px-3 py-2.5 text-capsule-text shadow-sm outline-none transition;
+    border-color: var(--capsule-border);
+    background-color: rgba(255, 255, 255, 0.72);
+  }
+
+  .capsule-input::placeholder {
+    color: rgba(110, 135, 141, 0.55);
+  }
+
+  .capsule-input:focus {
+    border-color: var(--capsule-primary);
+    box-shadow: 0 0 0 3px var(--capsule-primary-soft);
+  }
+
+  .capsule-label {
+    @apply block text-sm font-medium text-capsule-text;
+  }
+
+  .capsule-header-shell {
+    border-bottom: 1px solid var(--capsule-border);
+    background: rgba(255, 255, 255, 0.55);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  .capsule-nav-link {
+    @apply rounded-full px-4 py-2 text-sm font-medium transition;
+  }
+
+  .capsule-nav-link--active {
+    background-color: var(--capsule-primary-soft);
+    color: var(--capsule-text);
+    box-shadow: 0 0 0 1px rgba(93, 153, 166, 0.35);
+  }
+
+  .capsule-nav-link--inactive {
+    @apply text-capsule-text-muted;
+  }
+
+  .capsule-nav-link--inactive:hover {
+    background-color: rgba(255, 255, 255, 0.55);
+    color: var(--capsule-text);
+  }
+
+  .capsule-stat-pill {
+    border-radius: var(--radius-md);
+    border: 1px solid var(--capsule-border);
+    background: rgba(255, 255, 255, 0.5);
+    box-shadow: var(--capsule-glass-shadow);
+    backdrop-filter: blur(10px);
+  }
+
+  .capsule-slot-row {
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--capsule-border);
+    background: rgba(255, 255, 255, 0.48);
+    box-shadow: 0 2px 16px rgba(93, 153, 166, 0.06);
+    backdrop-filter: blur(12px);
+  }
+
+  .capsule-chip-success {
+    background-color: var(--capsule-success-soft);
+    color: #3d5c48;
+    box-shadow: 0 0 0 1px rgba(122, 171, 140, 0.35);
+  }
+
+  .capsule-chip-warning {
+    background-color: var(--capsule-warning-soft);
+    color: #6b5230;
+    box-shadow: 0 0 0 1px rgba(201, 166, 110, 0.4);
+  }
+
+  .capsule-chip-danger {
+    background-color: var(--capsule-danger-soft);
+    color: #6b4545;
+    box-shadow: 0 0 0 1px rgba(201, 138, 138, 0.4);
+  }
+
+  .capsule-chip-pending {
+    background-color: var(--capsule-pending-soft);
+    color: #3d5a62;
+    box-shadow: 0 0 0 1px rgba(93, 153, 166, 0.3);
+  }
+
+  .capsule-btn-ghost-danger {
+    @apply inline-flex min-h-10 items-center justify-center rounded-[var(--radius-md)] border px-3.5 py-2 text-sm font-medium transition;
+    border-color: rgba(201, 138, 138, 0.42);
+    color: #7a4a4a;
+    background-color: rgba(255, 255, 255, 0.55);
+  }
+
+  .capsule-btn-ghost-danger:hover {
+    background-color: var(--capsule-danger-soft);
+  }
+
+  .capsule-progress-track {
+    @apply flex h-3.5 overflow-hidden rounded-full;
+    border: 1px solid var(--capsule-border);
+    background: rgba(255, 255, 255, 0.65);
+    box-shadow: inset 0 1px 2px rgba(110, 135, 141, 0.12);
+  }
+
+  .capsule-step-enter {
+    animation: capsule-step-enter 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes capsule-step-enter {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
