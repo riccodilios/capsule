@@ -4,7 +4,10 @@ import { addDays, format, parseISO } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import type { Doc, Id } from "./_generated/dataModel";
 import { getEffectiveStatus } from "./lib/status.js";
-import { medicationAppliesToDay } from "./lib/schedule.js";
+import {
+  medicationAccountabilityStartMs,
+  medicationAppliesToDay,
+} from "./lib/schedule.js";
 import {
   ADHERENCE_MONTH_SNAPSHOT_VERSION,
   aggregateDayCountsFromSlots,
@@ -41,14 +44,20 @@ function collectUpcomingFeedItems(
   timeZone: string,
   logByKey: Map<string, Doc<"adherenceLogs">>,
   now: number,
+  userOnboardingCompletedAt?: number | null,
 ): FeedItem[] {
   const out: FeedItem[] = [];
   for (let offset = 0; offset <= UPCOMING_FEED_LOOKAHEAD_DAYS; offset++) {
     const dISO = format(addDays(parseISO(startDayISO), offset), "yyyy-MM-dd");
     for (const med of medications) {
       if (!medicationAppliesToDay(med, dISO, timeZone)) continue;
+      const accountabilityStart = medicationAccountabilityStartMs(
+        med,
+        userOnboardingCompletedAt,
+      );
       for (const t of med.reminderTimes) {
         const scheduledFor = scheduledUtcMs(dISO, t.hour, t.minute, timeZone);
+        if (scheduledFor < accountabilityStart) continue;
         if (scheduledFor <= now) continue;
         const key = `${med._id}_${scheduledFor}`;
         const log = logByKey.get(key) ?? null;
@@ -114,12 +123,20 @@ export const getDay = query({
     if (firstMonthYm > currentYm) {
       firstMonthYm = currentYm;
     }
-    const medCreatedAt = new Map(
-      medicationsAll.map((m) => [m._id, m.createdAt] as const),
+    const medById = new Map(
+      medicationsAll.map((m) => [m._id, m] as const),
     );
     const monthChartOpts = {
-      doseNotBeforeMs: (medicationId: Id<"medications">) =>
-        Math.max(chartAnchorMs, medCreatedAt.get(medicationId) ?? chartAnchorMs),
+      doseNotBeforeMs: (medicationId: Id<"medications">) => {
+        const med = medById.get(medicationId);
+        if (!med) return chartAnchorMs;
+        const start = medicationAccountabilityStartMs(
+          med,
+          settings?.onboardingCompletedAt,
+        );
+        return Math.max(chartAnchorMs, start);
+      },
+      userOnboardingCompletedAt: settings?.onboardingCompletedAt,
     };
 
     const monthKeysForChart = computeMonthlyChartMonthKeys(
@@ -161,6 +178,7 @@ export const getDay = query({
       logByKey,
       now,
       timeZone,
+      { userOnboardingCompletedAt: settings?.onboardingCompletedAt },
     );
 
     const dayCounts = aggregateDayCountsFromSlots(slots, now, monthChartOpts);
@@ -269,6 +287,7 @@ export const getDay = query({
       timeZone,
       logByKey,
       now,
+      settings?.onboardingCompletedAt,
     );
 
     const recentLogs = await ctx.db
@@ -282,6 +301,13 @@ export const getDay = query({
 
     for (const log of recentLogs) {
       const med = await ctx.db.get(log.medicationId);
+      if (
+        med &&
+        log.scheduledFor <
+          medicationAccountabilityStartMs(med, settings?.onboardingCompletedAt)
+      ) {
+        continue;
+      }
       const name = med?.name ?? "—";
       const dosage = med?.dosage;
       const base = {
@@ -431,12 +457,20 @@ export const finalizePastMonthSnapshots = mutation({
       dayEnd,
       now + UPCOMING_FEED_LOOKAHEAD_DAYS * 86400000,
     );
-    const medCreatedAt = new Map(
-      medicationsAll.map((m) => [m._id, m.createdAt] as const),
+    const medByIdFinalize = new Map(
+      medicationsAll.map((m) => [m._id, m] as const),
     );
     const monthChartOpts = {
-      doseNotBeforeMs: (medicationId: Id<"medications">) =>
-        Math.max(chartAnchorMs, medCreatedAt.get(medicationId) ?? chartAnchorMs),
+      doseNotBeforeMs: (medicationId: Id<"medications">) => {
+        const med = medByIdFinalize.get(medicationId);
+        if (!med) return chartAnchorMs;
+        const start = medicationAccountabilityStartMs(
+          med,
+          settings?.onboardingCompletedAt,
+        );
+        return Math.max(chartAnchorMs, start);
+      },
+      userOnboardingCompletedAt: settings?.onboardingCompletedAt,
     };
 
     const logs = await ctx.db

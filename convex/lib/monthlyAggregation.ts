@@ -2,11 +2,14 @@ import { addDays, format, parseISO } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import type { Doc, Id } from "../_generated/dataModel";
 import { getEffectiveStatus, type EffectiveStatus } from "./status.js";
-import { medicationAppliesToDay } from "./schedule.js";
+import {
+  medicationAccountabilityStartMs,
+  medicationAppliesToDay,
+} from "./schedule.js";
 import { MISSED_AFTER_MS, scheduledUtcMs } from "./time.js";
 
 /** Bump when month bar rules change so frozen snapshots are refreshed. */
-export const ADHERENCE_MONTH_SNAPSHOT_VERSION = 5;
+export const ADHERENCE_MONTH_SNAPSHOT_VERSION = 6;
 
 type DaySlot = {
   medicationId: Id<"medications">;
@@ -23,6 +26,7 @@ export function buildSlotsForDay(
   logByKey: Map<string, Doc<"adherenceLogs">>,
   now: number,
   timeZone: string,
+  opts?: { userOnboardingCompletedAt?: number | null },
 ): DaySlot[] {
   const dayStart = fromZonedTime(`${dayISO}T00:00:00`, timeZone).getTime();
   const nextDayISO = format(addDays(parseISO(dayISO), 1), "yyyy-MM-dd");
@@ -30,11 +34,15 @@ export function buildSlotsForDay(
   const slots: DaySlot[] = [];
   for (const med of medications) {
     if (!medicationAppliesToDay(med, dayISO, timeZone)) continue;
+    const accountabilityStart = medicationAccountabilityStartMs(
+      med,
+      opts?.userOnboardingCompletedAt,
+    );
     for (const t of med.reminderTimes) {
       const scheduledFor = scheduledUtcMs(dayISO, t.hour, t.minute, timeZone);
       if (scheduledFor < dayStart || scheduledFor >= dayEnd) continue;
-      // No slot for times before the med existed (e.g. add at 8pm with 5pm reminder — not "missed" today).
-      if (scheduledFor < med.createdAt) continue;
+      // No slot for reminder instants before tracking started (e.g. add at night: skip morning/noon today).
+      if (scheduledFor < accountabilityStart) continue;
       const key = `${med._id}_${scheduledFor}`;
       const log = logByKey.get(key) ?? null;
       const effective = getEffectiveStatus(log, now, scheduledFor);
@@ -154,6 +162,8 @@ export type MonthChartAggregateOptions = {
    * still comes from adherence logs when present.
    */
   activeOnlyForSlots?: boolean;
+  /** Passed to buildSlotsForDay (same rule as dose accountability). */
+  userOnboardingCompletedAt?: number | null;
 };
 
 export function aggregateMonthCounts(
@@ -217,6 +227,7 @@ export function aggregateMonthCounts(
       logByKey,
       now,
       timeZone,
+      { userOnboardingCompletedAt: chart?.userOnboardingCompletedAt },
     );
     for (const s of slots) {
       const key = `${s.medicationId}_${s.scheduledFor}`;

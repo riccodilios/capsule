@@ -55,3 +55,23 @@ export function medicationAppliesToDay(
       return true;
   }
 }
+
+/**
+ * Earliest UTC instant we count adherence for this medication. Uses `createdAt`
+ * when present; combines with `userOnboardingCompletedAt` so legacy rows without
+ * `createdAt` still align with onboarding, and `scheduledFor < undefined` never
+ * disables the “skip pre‑creation reminders” guard.
+ */
+export function medicationAccountabilityStartMs(
+  med: Med,
+  userOnboardingCompletedAt?: number | null,
+): number {
+  const onboard =
+    typeof userOnboardingCompletedAt === "number" &&
+    userOnboardingCompletedAt > 0
+      ? userOnboardingCompletedAt
+      : 0;
+  const raw = med.createdAt;
+  const medMs = typeof raw === "number" && raw > 0 ? raw : 0;
+  return Math.max(medMs, onboard);
+}
