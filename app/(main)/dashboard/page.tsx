@@ -56,21 +56,37 @@ export default function DashboardPage() {
     });
   }, [dayISO, finalizePastMonthSnapshots, nowMs, settings]);
 
+  /** Due "pending" first; then catch-up for past times today with no log (e.g. open app at 7pm for 5pm dose). */
   const alarmSlot = useMemo((): AlarmSlot | null => {
     if (!summary?.slots) return null;
-    const due = summary.slots.filter(
+    if (settings?.alertsEnabled === false) return null;
+
+    const pendingDue = summary.slots.filter(
       (s) => s.effective === "pending" && nowMs >= s.scheduledFor,
     );
-    due.sort((a, b) => a.scheduledFor - b.scheduledFor);
-    const s = due[0];
-    if (!s) return null;
+    pendingDue.sort((a, b) => a.scheduledFor - b.scheduledFor);
+    const firstPending = pendingDue[0];
+    if (firstPending) {
+      return {
+        medicationId: firstPending.medicationId,
+        medicationName: firstPending.medicationName,
+        dosage: firstPending.dosage,
+        scheduledFor: firstPending.scheduledFor,
+      };
+    }
+
+    const catchUp = summary.slots
+      .filter((s) => s.log == null && s.scheduledFor < nowMs)
+      .sort((a, b) => a.scheduledFor - b.scheduledFor);
+    const c = catchUp[0];
+    if (!c) return null;
     return {
-      medicationId: s.medicationId,
-      medicationName: s.medicationName,
-      dosage: s.dosage,
-      scheduledFor: s.scheduledFor,
+      medicationId: c.medicationId,
+      medicationName: c.medicationName,
+      dosage: c.dosage,
+      scheduledFor: c.scheduledFor,
     };
-  }, [summary?.slots, nowMs]);
+  }, [summary?.slots, nowMs, settings?.alertsEnabled]);
 
   const monthlyChartRows = useMemo(() => {
     if (summary == null) return [];
