@@ -6,7 +6,7 @@ import { medicationAppliesToDay } from "./schedule.js";
 import { MISSED_AFTER_MS, scheduledUtcMs } from "./time.js";
 
 /** Bump when month bar rules change so frozen snapshots are refreshed. */
-export const ADHERENCE_MONTH_SNAPSHOT_VERSION = 4;
+export const ADHERENCE_MONTH_SNAPSHOT_VERSION = 5;
 
 type DaySlot = {
   medicationId: Id<"medications">;
@@ -33,6 +33,8 @@ export function buildSlotsForDay(
     for (const t of med.reminderTimes) {
       const scheduledFor = scheduledUtcMs(dayISO, t.hour, t.minute, timeZone);
       if (scheduledFor < dayStart || scheduledFor >= dayEnd) continue;
+      // No slot for times before the med existed (e.g. add at 8pm with 5pm reminder — not "missed" today).
+      if (scheduledFor < med.createdAt) continue;
       const key = `${med._id}_${scheduledFor}`;
       const log = logByKey.get(key) ?? null;
       const effective = getEffectiveStatus(log, now, scheduledFor);
