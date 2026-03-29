@@ -164,8 +164,9 @@ body {
     border-color: rgba(110, 135, 141, 0.5);
   }
 
+  /* text-base (16px): iOS Safari avoids auto-zoom on focus when font-size >= 16px */
   .capsule-input {
-    @apply mt-1.5 w-full rounded-[var(--radius-md)] border px-3 py-2.5 text-capsule-text shadow-sm outline-none transition;
+    @apply mt-1.5 w-full rounded-[var(--radius-md)] border px-3 py-2.5 text-base text-capsule-text shadow-sm outline-none transition;
     border-color: var(--capsule-border);
     background-color: rgba(255, 255, 255, 0.72);
   }

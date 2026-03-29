@@ -31,7 +31,7 @@ export const capsuleClerkAppearance: NonNullable<
     formFieldLabel: "text-capsule-text font-medium",
     formFieldInput: [
       "border-[color:rgba(110,135,141,0.32)]",
-      "bg-white text-capsule-text placeholder:text-capsule-text-muted/70",
+      "bg-white text-base text-capsule-text placeholder:text-capsule-text-muted/70",
     ].join(" "),
     footerActionLink: "text-[#5D99A6] hover:text-[#6faab7]",
     formButtonPrimary:

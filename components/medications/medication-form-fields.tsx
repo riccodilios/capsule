@@ -14,7 +14,7 @@ import { cn } from "@/lib/cn";
 type Onboarding = Dictionary["onboarding"];
 
 const timeInputClass =
-  "capsule-input mt-0 w-[4.25rem] font-mono text-sm placeholder:text-capsule-text-muted/50";
+  "capsule-input mt-0 w-[4.25rem] font-mono text-base placeholder:text-capsule-text-muted/50";
 
 /** Hour 1–12 only; invalid two-digit values (e.g. 20) do not commit until fixed or blur. */
 function Hour12Input({
@@ -410,7 +410,7 @@ export function MedicationFormFields({
               />
               <select
                 id={`${fieldIdPrefix}-t-${ti}-ampm`}
-                className="capsule-input mt-0 min-w-[5.25rem] text-sm"
+                className="capsule-input mt-0 min-w-[5.25rem] text-base"
                 aria-label={
                   locale === "ar"
                     ? `${o.timeAm.ar} / ${o.timePm.ar}`

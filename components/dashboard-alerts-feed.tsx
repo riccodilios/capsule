@@ -19,27 +19,30 @@ export type FeedItem = {
 };
 
 function formatRelativeUntil(diffMs: number, locale: Locale): string {
-  const twoHoursMs = 2 * 60 * 60 * 1000;
-  const fortyEightHoursMs = 48 * 60 * 60 * 1000;
-  if (diffMs < twoHoursMs) {
-    const m = Math.max(1, Math.ceil(diffMs / 60_000));
+  const minuteMs = 60_000;
+  const hourMs = 60 * 60 * 1000;
+  const dayMs = 24 * 60 * 60 * 1000;
+  const d = Math.max(0, diffMs);
+
+  if (d <= hourMs) {
+    const m = Math.max(1, Math.ceil(d / minuteMs));
     if (locale === "ar") {
       return m === 1 ? "دقيقة واحدة" : `${m} دقيقة`;
     }
     return m === 1 ? "1 minute" : `${m} minutes`;
   }
-  if (diffMs < fortyEightHoursMs) {
-    const h = Math.max(1, Math.round(diffMs / 3_600_000));
+  if (d <= dayMs) {
+    const h = Math.max(1, Math.round(d / hourMs));
     if (locale === "ar") {
       return h === 1 ? "ساعة واحدة" : `${h} ساعات`;
     }
     return h === 1 ? "1 hour" : `${h} hours`;
   }
-  const d = Math.max(1, Math.ceil(diffMs / 86_400_000));
+  const days = Math.max(1, Math.round(d / dayMs));
   if (locale === "ar") {
-    return d === 1 ? "يوم واحد" : `${d} أيام`;
+    return days === 1 ? "يوم واحد" : `${days} أيام`;
   }
-  return d === 1 ? "1 day" : `${d} days`;
+  return days === 1 ? "1 day" : `${days} days`;
 }
 
 const FEED_PREVIEW_COUNT = 3;
