@@ -1,6 +1,8 @@
+import type { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { DEFAULT_TIME_ZONE } from "../lib/timezones";
+import { listPastDoseInstantsNeedingConfirmation } from "./lib/pastDosesConfirm.js";
 import {
   medicationDuration,
   medicationSchedule,
@@ -189,8 +191,9 @@ export const completeWithMedications = mutation({
       assertDurationValid(m.duration);
     }
 
+    const insertedIds: Id<"medications">[] = [];
     for (const m of meds) {
-      await ctx.db.insert("medications", {
+      const id = await ctx.db.insert("medications", {
         userId: identity.subject,
         name: m.name.trim(),
         dosage: m.dosage?.trim(),
@@ -202,6 +205,7 @@ export const completeWithMedications = mutation({
         createdAt: now,
         updatedAt: now,
       });
+      insertedIds.push(id);
     }
 
     await ctx.db.patch(settings._id, {
@@ -209,6 +213,33 @@ export const completeWithMedications = mutation({
       updatedAt: now,
     });
 
-    return { ok: true as const };
+    const timeZone = settings.timeZone ?? DEFAULT_TIME_ZONE;
+    const pastDosesQueues: {
+      medicationId: Id<"medications">;
+      name: string;
+      slots: { scheduledFor: number }[];
+    }[] = [];
+
+    for (const id of insertedIds) {
+      const med = await ctx.db.get(id);
+      if (!med) continue;
+      const slots = await listPastDoseInstantsNeedingConfirmation(
+        ctx,
+        med,
+        timeZone,
+        now,
+        now,
+        null,
+      );
+      if (slots.length > 0) {
+        pastDosesQueues.push({
+          medicationId: id,
+          name: med.name,
+          slots,
+        });
+      }
+    }
+
+    return { ok: true as const, pastDosesQueues };
   },
 });

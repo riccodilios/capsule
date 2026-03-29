@@ -15,6 +15,10 @@ import {
 import { GlassPanel } from "@/components/glass-panel";
 import { BilingualFieldLabel, BilingualLabel } from "@/components/onboarding/bilingual-label";
 import { MedicationFormFields } from "@/components/medications/medication-form-fields";
+import {
+  PastDosesTodayModal,
+  type PastDoseStep,
+} from "@/components/medications/past-doses-today-modal";
 import { cn } from "@/lib/cn";
 import { DEFAULT_TIME_ZONE } from "@/lib/timezones";
 
@@ -46,6 +50,9 @@ export function OnboardingWizard() {
     api.onboarding.completeWithMedications,
   );
 
+  const [pastOnboardingSteps, setPastOnboardingSteps] = useState<
+    PastDoseStep[] | null
+  >(null);
   const [step, setStep] = useState(1);
   const [age, setAge] = useState("");
   const [sex, setSex] = useState<Sex | "">("");
@@ -143,15 +150,36 @@ export function OnboardingWizard() {
     }
     setBusy(true);
     try {
-      await completeWithMedications({
+      const result = await completeWithMedications({
         medications: meds.map((d) => draftToApi(d, timeZone)),
       });
+      const queues = result.pastDosesQueues ?? [];
+      if (queues.length > 0) {
+        const steps: PastDoseStep[] = [];
+        for (const q of queues) {
+          for (const s of q.slots) {
+            steps.push({
+              medicationId: q.medicationId,
+              medicationName: q.name,
+              scheduledFor: s.scheduledFor,
+            });
+          }
+        }
+        steps.sort((a, b) => a.scheduledFor - b.scheduledFor);
+        setPastOnboardingSteps(steps);
+        return;
+      }
       router.replace("/dashboard");
     } catch {
       showError({ en: t.common.error, ar: t.common.error });
     } finally {
       setBusy(false);
     }
+  }
+
+  function onPastOnboardingDone() {
+    setPastOnboardingSteps(null);
+    router.replace("/dashboard");
   }
 
   function updateMed(id: string, patch: Partial<MedicationDraft>) {
@@ -181,6 +209,15 @@ export function OnboardingWizard() {
   }
 
   return (
+    <>
+      <PastDosesTodayModal
+        open={
+          pastOnboardingSteps != null && pastOnboardingSteps.length > 0
+        }
+        steps={pastOnboardingSteps ?? []}
+        timeZone={timeZone}
+        onDone={onPastOnboardingDone}
+      />
     <div className="mx-auto max-w-xl space-y-10" dir={dir}>
       <header className="space-y-3 text-center sm:text-start">
         <BilingualLabel pair={o.pageTitle} locale={locale} as="h1" />
@@ -479,5 +516,6 @@ export function OnboardingWizard() {
         ) : null}
       </div>
     </div>
+    </>
   );
 }

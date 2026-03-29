@@ -150,6 +150,13 @@ export type Dictionary = {
     modalAddTitle: string;
     modalEditTitle: string;
     confirmDelete: string;
+    /** Shown after saving a med when earlier today’s reminder times need confirmation. */
+    pastDosesTitle: string;
+    pastDosesIntro: string;
+    pastDosesStep: string;
+    pastDosesTook: string;
+    pastDosesSkipped: string;
+    pastDosesLater: string;
   };
   settings: {
     title: string;
@@ -520,6 +527,13 @@ const en: Dictionary = {
     modalAddTitle: "Add medication",
     modalEditTitle: "Edit medication",
     confirmDelete: "Remove this medication from your active list?",
+    pastDosesTitle: "Earlier doses today",
+    pastDosesIntro:
+      "You added or updated this medication after some of today’s reminder times. Did you already take those doses?",
+    pastDosesStep: "{current} of {total}",
+    pastDosesTook: "Yes, I took it",
+    pastDosesSkipped: "No, I skipped it",
+    pastDosesLater: "Ask me later",
   },
   settings: {
     title: "Settings",
@@ -704,6 +718,13 @@ const ar: Dictionary = {
     modalAddTitle: "إضافة دواء",
     modalEditTitle: "تعديل الدواء",
     confirmDelete: "إزالة هذا الدواء من القائمة النشطة؟",
+    pastDosesTitle: "جرعات اليوم السابقة",
+    pastDosesIntro:
+      "أضفت أو حدّثت هذا الدواء بعد بعض أوقات التذكير اليوم. هل أخذت تلك الجرعات؟",
+    pastDosesStep: "{current} من {total}",
+    pastDosesTook: "نعم، أخذتها",
+    pastDosesSkipped: "لا، لم آخذها",
+    pastDosesLater: "ذكّرني لاحقاً",
   },
   settings: {
     title: "الإعدادات",

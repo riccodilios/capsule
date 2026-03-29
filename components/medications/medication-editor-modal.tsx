@@ -13,6 +13,10 @@ import {
   type MedicationDraft,
 } from "@/lib/medication-draft";
 import { MedicationFormFields } from "@/components/medications/medication-form-fields";
+import {
+  PastDosesTodayModal,
+  type PastDoseStep,
+} from "@/components/medications/past-doses-today-modal";
 import { cn } from "@/lib/cn";
 
 type Mode = "add" | "edit";
@@ -39,6 +43,7 @@ export function MedicationEditorModal({
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [pastSteps, setPastSteps] = useState<PastDoseStep[] | null>(null);
 
   const create = useMutation(api.medications.create);
   const update = useMutation(api.medications.update);
@@ -47,6 +52,7 @@ export function MedicationEditorModal({
   // `timeZone` updates (that re-ran this effect and wiped reminder time edits).
   useEffect(() => {
     if (!open) return;
+    setPastSteps(null);
     setError(null);
     if (mode === "edit" && initialMed) {
       setDraft(docToDraft(initialMed, timeZone));
@@ -69,6 +75,11 @@ export function MedicationEditorModal({
     return null;
   }
 
+  function finishPastFlow() {
+    setPastSteps(null);
+    onClose();
+  }
+
   function patch(p: Partial<MedicationDraft>) {
     setDraft((d) => ({ ...d, ...p }));
   }
@@ -85,15 +96,25 @@ export function MedicationEditorModal({
     try {
       const payload = draftToApi(draft, timeZone);
       if (mode === "add") {
-        await create({
+        const r = await create({
           name: payload.name,
           dosage: payload.dosage,
           reminderTimes: payload.reminderTimes,
           schedule: payload.schedule,
           duration: payload.duration,
         });
+        if (r.pastDosesToConfirm.length > 0) {
+          setPastSteps(
+            r.pastDosesToConfirm.map((s) => ({
+              medicationId: r.medicationId,
+              medicationName: payload.name,
+              scheduledFor: s.scheduledFor,
+            })),
+          );
+          return;
+        }
       } else if (initialMed) {
-        await update({
+        const r = await update({
           id: initialMed._id,
           name: payload.name,
           dosage: payload.dosage,
@@ -101,6 +122,16 @@ export function MedicationEditorModal({
           schedule: payload.schedule,
           duration: payload.duration,
         });
+        if (r.pastDosesToConfirm.length > 0) {
+          setPastSteps(
+            r.pastDosesToConfirm.map((s) => ({
+              medicationId: r.medicationId,
+              medicationName: payload.name,
+              scheduledFor: s.scheduledFor,
+            })),
+          );
+          return;
+        }
       }
       onClose();
     } catch {
@@ -114,6 +145,14 @@ export function MedicationEditorModal({
     mode === "add" ? medCopy.modalAddTitle : medCopy.modalEditTitle;
 
   const modal = (
+    <>
+      <PastDosesTodayModal
+        open={pastSteps != null && pastSteps.length > 0}
+        steps={pastSteps ?? []}
+        timeZone={timeZone}
+        onDone={finishPastFlow}
+      />
+      {pastSteps == null ? (
     <div
       className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6"
       role="presentation"
@@ -169,6 +208,8 @@ export function MedicationEditorModal({
         </form>
       </div>
     </div>
+      ) : null}
+    </>
   );
 
   return createPortal(modal, document.body);

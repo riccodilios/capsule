@@ -1,5 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { DEFAULT_TIME_ZONE } from "../lib/timezones";
+import { listPastDoseInstantsNeedingConfirmation } from "./lib/pastDosesConfirm.js";
 import {
   medicationDuration,
   medicationSchedule,
@@ -47,7 +49,13 @@ export const create = mutation({
       throw new Error("At least one reminder time is required");
     }
     const now = Date.now();
-    return await ctx.db.insert("medications", {
+    const settings = await ctx.db
+      .query("userSettings")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .unique();
+    const timeZone = settings?.timeZone ?? DEFAULT_TIME_ZONE;
+
+    const id = await ctx.db.insert("medications", {
       userId: identity.subject,
       name: args.name.trim(),
       dosage: args.dosage?.trim(),
@@ -59,6 +67,21 @@ export const create = mutation({
       createdAt: now,
       updatedAt: now,
     });
+
+    const med = await ctx.db.get(id);
+    const pastDosesToConfirm =
+      med != null
+        ? await listPastDoseInstantsNeedingConfirmation(
+            ctx,
+            med,
+            timeZone,
+            settings?.onboardingCompletedAt,
+            now,
+            null,
+          )
+        : [];
+
+    return { medicationId: id, pastDosesToConfirm };
   },
 });
 
@@ -80,6 +103,7 @@ export const update = mutation({
     if (!med || med.userId !== identity.subject) {
       throw new Error("Medication not found");
     }
+    const reminderTimesBefore = med.reminderTimes;
     const patch: Record<string, unknown> = { updatedAt: Date.now() };
     if (args.name !== undefined) patch.name = args.name.trim();
     if (args.dosage !== undefined) patch.dosage = args.dosage.trim();
@@ -94,7 +118,27 @@ export const update = mutation({
     if (args.duration !== undefined) patch.duration = args.duration;
     if (args.active !== undefined) patch.active = args.active;
     await ctx.db.patch(args.id, patch);
-    return args.id;
+
+    const settings = await ctx.db
+      .query("userSettings")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .unique();
+    const timeZone = settings?.timeZone ?? DEFAULT_TIME_ZONE;
+    const now = Date.now();
+    const updated = await ctx.db.get(args.id);
+    const pastDosesToConfirm =
+      updated != null
+        ? await listPastDoseInstantsNeedingConfirmation(
+            ctx,
+            updated,
+            timeZone,
+            settings?.onboardingCompletedAt,
+            now,
+            reminderTimesBefore,
+          )
+        : [];
+
+    return { medicationId: args.id, pastDosesToConfirm };
   },
 });
 

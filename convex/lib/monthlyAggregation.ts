@@ -9,7 +9,7 @@ import {
 import { MISSED_AFTER_MS, scheduledUtcMs } from "./time.js";
 
 /** Bump when month bar rules change so frozen snapshots are refreshed. */
-export const ADHERENCE_MONTH_SNAPSHOT_VERSION = 6;
+export const ADHERENCE_MONTH_SNAPSHOT_VERSION = 7;
 
 type DaySlot = {
   medicationId: Id<"medications">;
@@ -41,10 +41,10 @@ export function buildSlotsForDay(
     for (const t of med.reminderTimes) {
       const scheduledFor = scheduledUtcMs(dayISO, t.hour, t.minute, timeZone);
       if (scheduledFor < dayStart || scheduledFor >= dayEnd) continue;
-      // No slot for reminder instants before tracking started (e.g. add at night: skip morning/noon today).
-      if (scheduledFor < accountabilityStart) continue;
       const key = `${med._id}_${scheduledFor}`;
       const log = logByKey.get(key) ?? null;
+      // No slot for reminder instants before tracking started, unless user logged an outcome (backfill).
+      if (scheduledFor < accountabilityStart && !log) continue;
       const effective = getEffectiveStatus(log, now, scheduledFor);
       slots.push({
         medicationId: med._id,
@@ -200,7 +200,13 @@ export function aggregateMonthCounts(
     }
     if (log.scheduledFor > now) continue;
     const key = `${log.medicationId}_${log.scheduledFor}`;
-    if (chart && log.scheduledFor < chart.doseNotBeforeMs(log.medicationId)) {
+    if (
+      chart &&
+      log.scheduledFor < chart.doseNotBeforeMs(log.medicationId) &&
+      log.status !== "taken_on_time" &&
+      log.status !== "missed" &&
+      log.status !== "snoozed"
+    ) {
       countedKeys.add(key);
       continue;
     }
@@ -236,7 +242,11 @@ export function aggregateMonthCounts(
         countedKeys.add(key);
         continue;
       }
-      if (chart && s.scheduledFor < chart.doseNotBeforeMs(s.medicationId)) {
+      if (
+        chart &&
+        s.scheduledFor < chart.doseNotBeforeMs(s.medicationId) &&
+        !s.log
+      ) {
         countedKeys.add(key);
         continue;
       }
@@ -297,7 +307,11 @@ export function aggregateDayCountsFromSlots(
   let pendingOutcome = 0;
   for (const s of slots) {
     if (s.scheduledFor > now) continue;
-    if (chart && s.scheduledFor < chart.doseNotBeforeMs(s.medicationId)) {
+    if (
+      chart &&
+      s.scheduledFor < chart.doseNotBeforeMs(s.medicationId) &&
+      !s.log
+    ) {
       continue;
     }
     const c = classifyForMonthBar(s.log, s.effective, s.scheduledFor, now);

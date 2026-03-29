@@ -301,12 +301,18 @@ export const getDay = query({
 
     for (const log of recentLogs) {
       const med = await ctx.db.get(log.medicationId);
-      if (
-        med &&
-        log.scheduledFor <
-          medicationAccountabilityStartMs(med, settings?.onboardingCompletedAt)
-      ) {
-        continue;
+      if (med) {
+        const acc = medicationAccountabilityStartMs(
+          med,
+          settings?.onboardingCompletedAt,
+        );
+        const hasOutcome =
+          log.status === "taken_on_time" ||
+          log.status === "missed" ||
+          log.status === "snoozed";
+        if (log.scheduledFor < acc && !hasOutcome) {
+          continue;
+        }
       }
       const name = med?.name ?? "—";
       const dosage = med?.dosage;

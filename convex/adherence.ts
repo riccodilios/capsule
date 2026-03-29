@@ -1,6 +1,8 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
+import { DEFAULT_TIME_ZONE } from "../lib/timezones";
+import { assertValidPastDoseConfirmation } from "./lib/pastDosesConfirm.js";
 import { SNOOZE_MINUTES_DEFAULT } from "./lib/time.js";
 
 function delayOutcomeFields(existing: Doc<"adherenceLogs">) {
@@ -141,6 +143,75 @@ export const snooze = mutation({
       wasSnoozed: true,
       updatedAt: now,
     });
+  },
+});
+
+/**
+ * Backfill taken/missed for same-day reminder times that fell before tracking started
+ * (e.g. user added medication at night; morning/noon need explicit confirmation).
+ */
+export const recordPastDoseOutcomes = mutation({
+  args: {
+    medicationId: v.id("medications"),
+    entries: v.array(
+      v.object({
+        scheduledFor: v.number(),
+        outcome: v.union(v.literal("taken"), v.literal("missed")),
+      }),
+    ),
+  },
+  handler: async (ctx, { medicationId, entries }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    const med = await ctx.db.get(medicationId);
+    if (!med || med.userId !== identity.subject) {
+      throw new Error("Medication not found");
+    }
+    const settings = await ctx.db
+      .query("userSettings")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .unique();
+    const timeZone = settings?.timeZone ?? DEFAULT_TIME_ZONE;
+    const now = Date.now();
+
+    for (const { scheduledFor, outcome } of entries) {
+      assertValidPastDoseConfirmation(
+        med,
+        timeZone,
+        settings?.onboardingCompletedAt,
+        now,
+        scheduledFor,
+      );
+      const existing = await ctx.db
+        .query("adherenceLogs")
+        .withIndex("by_lookup", (q) =>
+          q
+            .eq("userId", identity.subject)
+            .eq("medicationId", medicationId)
+            .eq("scheduledFor", scheduledFor),
+        )
+        .unique();
+      if (existing) continue;
+
+      if (outcome === "taken") {
+        await ctx.db.insert("adherenceLogs", {
+          userId: identity.subject,
+          medicationId,
+          scheduledFor,
+          status: "taken_on_time",
+          takenAt: now,
+          updatedAt: now,
+        });
+      } else {
+        await ctx.db.insert("adherenceLogs", {
+          userId: identity.subject,
+          medicationId,
+          scheduledFor,
+          status: "missed",
+          updatedAt: now,
+        });
+      }
+    }
   },
 });
 
