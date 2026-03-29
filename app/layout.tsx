@@ -24,7 +24,8 @@ export const metadata: Metadata = {
   description:
     "Track medications, smart alerts, and adherence with clarity and trust.",
   icons: {
-    icon: "/capsule-icon.png",
+    icon: [{ url: "/capsule-icon.png", type: "image/png" }],
+    shortcut: "/capsule-icon.png",
     apple: "/capsule-icon.png",
   },
 };
