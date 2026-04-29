@@ -90,6 +90,20 @@ export const removeSubscription = mutation({
   },
 });
 
+export const removeStaleEndpoint = internalMutation({
+  args: { endpoint: v.string() },
+  handler: async (ctx, { endpoint }) => {
+    const existing = await ctx.db
+      .query("pushSubscriptions")
+      .withIndex("by_endpoint", (q) => q.eq("endpoint", endpoint))
+      .unique();
+    if (existing) {
+      await ctx.db.delete(existing._id);
+    }
+    return null;
+  },
+});
+
 export type DuePush = {
   userId: string;
   subscription: {
@@ -107,6 +121,35 @@ export type DuePush = {
     actions: { action: "taken" | "missed" | "snooze15"; title: string }[];
   };
 };
+
+const SEND_WINDOW_MS = 5 * 60 * 1000;
+
+export const markPushSent = internalMutation({
+  args: {
+    userId: v.string(),
+    medicationId: v.id("medications"),
+    scheduledFor: v.number(),
+  },
+  handler: async (ctx, { userId, medicationId, scheduledFor }) => {
+    const existing = await ctx.db
+      .query("pushNotificationsSent")
+      .withIndex("by_lookup", (q) =>
+        q
+          .eq("userId", userId)
+          .eq("medicationId", medicationId)
+          .eq("scheduledFor", scheduledFor),
+      )
+      .unique();
+    if (existing) return null;
+    await ctx.db.insert("pushNotificationsSent", {
+      userId,
+      medicationId,
+      scheduledFor,
+      sentAt: Date.now(),
+    });
+    return null;
+  },
+});
 
 export const listDuePushes = internalMutation({
   args: { now: v.number() },
@@ -160,9 +203,9 @@ export const listDuePushes = internalMutation({
       });
 
       for (const s of slots) {
-        // Only send close to scheduled time (within 60 seconds), and only if still pending.
+        // Only send close to scheduled time (within window), and only if still pending.
         if (s.scheduledFor > now) continue;
-        if (now - s.scheduledFor > 60_000) continue;
+        if (now - s.scheduledFor > SEND_WINDOW_MS) continue;
 
         const effective = getEffectiveStatus(s.log, now, s.scheduledFor);
         if (effective !== "pending") continue;
@@ -177,14 +220,6 @@ export const listDuePushes = internalMutation({
           )
           .unique();
         if (already) continue;
-
-        // Record ledger immediately to avoid duplicates on retries.
-        await ctx.db.insert("pushNotificationsSent", {
-          userId,
-          medicationId: s.medicationId as Id<"medications">,
-          scheduledFor: s.scheduledFor,
-          sentAt: now,
-        });
 
         const hhmm = formatInTimeZone(s.scheduledFor, timeZone, "HH:mm");
         const title = locale === "ar" ? "تذكير الدواء" : "Medication reminder";

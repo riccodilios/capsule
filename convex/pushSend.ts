@@ -32,8 +32,18 @@ export const sendDueNotifications = internalAction({
           },
           payload,
         );
-      } catch {
-        // Best-effort: stale subscriptions are common; keep going.
+        await ctx.runMutation(internal.push.markPushSent, {
+          userId: item.userId,
+          medicationId: item.payload.medicationId as any,
+          scheduledFor: item.payload.scheduledFor,
+        });
+      } catch (err: any) {
+        const code = err?.statusCode;
+        if (code === 404 || code === 410) {
+          await ctx.runMutation(internal.push.removeStaleEndpoint, {
+            endpoint: item.subscription.endpoint,
+          });
+        }
       }
     }
     return null;
