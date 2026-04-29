@@ -55,8 +55,13 @@ export default function SettingsPage() {
 
   const uiLocale = settings?.locale ?? "ar";
   const notificationsEnabled = settings?.notificationsEnabled === true;
+  const [notifEnabledUi, setNotifEnabledUi] = useState<boolean>(false);
   const [notifBusy, setNotifBusy] = useState(false);
   const [notifError, setNotifError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setNotifEnabledUi(notificationsEnabled);
+  }, [notificationsEnabled]);
 
   function urlBase64ToUint8Array(base64String: string) {
     const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -113,6 +118,7 @@ export default function SettingsPage() {
         userAgent: navigator.userAgent,
       });
       await setNotificationsEnabled({ enabled: true });
+      setNotifEnabledUi(true);
     } finally {
       setNotifBusy(false);
     }
@@ -135,6 +141,7 @@ export default function SettingsPage() {
         }
       }
       await setNotificationsEnabled({ enabled: false });
+      setNotifEnabledUi(false);
     } finally {
       setNotifBusy(false);
     }
@@ -306,19 +313,27 @@ export default function SettingsPage() {
             <div className="mt-4 flex items-center justify-between gap-4 rounded-[var(--radius-md)] border border-[color:rgba(110,135,141,0.2)] bg-white/40 px-4 py-4">
               <div>
                 <p className="text-sm font-medium text-capsule-text">
-                  {notificationsEnabled ? s.notificationsDisable : s.notificationsEnable}
+                  {notifEnabledUi ? s.notificationsDisable : s.notificationsEnable}
                 </p>
               </div>
               <label className="relative inline-flex cursor-pointer items-center">
                 <input
                   type="checkbox"
                   className="peer sr-only"
-                  checked={notificationsEnabled}
+                  checked={notifEnabledUi}
                   disabled={notifBusy}
                   onChange={(e) => {
                     const next = e.target.checked;
-                    if (next) void enableNotifications();
-                    else void disableNotifications();
+                    setNotifEnabledUi(next);
+                    if (next) {
+                      void enableNotifications().catch(() => {
+                        setNotifEnabledUi(false);
+                      });
+                    } else {
+                      void disableNotifications().catch(() => {
+                        setNotifEnabledUi(true);
+                      });
+                    }
                   }}
                 />
                 <span
