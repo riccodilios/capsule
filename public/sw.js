@@ -51,3 +51,52 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
+// Web Push notification display.
+self.addEventListener("push", (event) => {
+  let data = null;
+  try {
+    data = event.data ? event.data.json() : null;
+  } catch {
+    data = null;
+  }
+  if (!data) return;
+
+  const actions = Array.isArray(data.actions) ? data.actions : [];
+  const scheduledFor = data.scheduledFor;
+  const medicationId = data.medicationId;
+  const baseUrl = "/dashboard";
+  const mk = (action) =>
+    `${baseUrl}?notif=1&action=${encodeURIComponent(action)}&medicationId=${encodeURIComponent(
+      medicationId,
+    )}&scheduledFor=${encodeURIComponent(String(scheduledFor))}`;
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || "Capsule", {
+      body: data.body || "",
+      lang: data.lang || "ar",
+      icon: data.icon || "/icons/icon-192.png",
+      badge: data.badge || "/icons/icon-192.png",
+      actions: actions,
+      data: {
+        url: baseUrl,
+        actionUrls: {
+          taken: mk("taken"),
+          missed: mk("missed"),
+          snooze15: mk("snooze15"),
+        },
+      },
+      requireInteraction: true,
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const data = event.notification.data || {};
+  const url =
+    (event.action && data.actionUrls && data.actionUrls[event.action]) ||
+    data.url ||
+    "/dashboard";
+  event.waitUntil(self.clients.openWindow(url));
+});
+

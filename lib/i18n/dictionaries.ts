@@ -181,6 +181,12 @@ export type Dictionary = {
     conditionsField: string;
     allergiesField: string;
     saveMedicalRecord: string;
+    notifications: string;
+    notificationsHint: string;
+    notificationsEnable: string;
+    notificationsDisable: string;
+    notificationsUnsupported: string;
+    notificationsDenied: string;
   };
   common: {
     loading: string;
@@ -559,6 +565,13 @@ const en: Dictionary = {
     conditionsField: "Medical conditions / issues",
     allergiesField: "Allergies",
     saveMedicalRecord: "Save medical record",
+    notifications: "Notifications",
+    notificationsHint:
+      "Get reminders as app notifications when Capsule is installed.",
+    notificationsEnable: "Enable notifications",
+    notificationsDisable: "Disable notifications",
+    notificationsUnsupported: "Notifications aren’t supported on this device/browser.",
+    notificationsDenied: "Permission denied. Enable notifications in your browser settings.",
   },
   common: {
     loading: "Loading…",
@@ -750,6 +763,13 @@ const ar: Dictionary = {
     conditionsField: "الحالات الصحية / المشكلات",
     allergiesField: "الحساسية",
     saveMedicalRecord: "حفظ السجل الطبي",
+    notifications: "الإشعارات",
+    notificationsHint:
+      "احصل على تذكيرات كإشعارات تطبيق عند تثبيت كابسول.",
+    notificationsEnable: "تفعيل الإشعارات",
+    notificationsDisable: "إيقاف الإشعارات",
+    notificationsUnsupported: "الإشعارات غير مدعومة على هذا الجهاز/المتصفح.",
+    notificationsDenied: "تم رفض الإذن. فعّل الإشعارات من إعدادات المتصفح.",
   },
   common: {
     loading: "جاري التحميل…",

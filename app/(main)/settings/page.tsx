@@ -18,6 +18,9 @@ export default function SettingsPage() {
   const updateTimeZone = useMutation(api.userSettings.updateTimeZone);
   const updateProfile = useMutation(api.userSettings.updateProfile);
   const saveMedicalContext = useMutation(api.onboarding.saveMedicalContext);
+  const setNotificationsEnabled = useMutation(api.push.setNotificationsEnabled);
+  const upsertSubscription = useMutation(api.push.upsertSubscription);
+  const removeSubscription = useMutation(api.push.removeSubscription);
 
   const [ageInput, setAgeInput] = useState("");
   const [sexValue, setSexValue] = useState<Sex | "">("");
@@ -51,6 +54,91 @@ export default function SettingsPage() {
   }, [timeZone]);
 
   const uiLocale = settings?.locale ?? "ar";
+  const notificationsEnabled = settings?.notificationsEnabled === true;
+  const [notifBusy, setNotifBusy] = useState(false);
+  const [notifError, setNotifError] = useState<string | null>(null);
+
+  function urlBase64ToUint8Array(base64String: string) {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding)
+      .replace(/-/g, "+")
+      .replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
+
+  async function enableNotifications() {
+    if (typeof window === "undefined") return;
+    setNotifError(null);
+    setNotifBusy(true);
+    try {
+      if (!("Notification" in window) || !("serviceWorker" in navigator)) {
+        setNotifError(s.notificationsUnsupported);
+        return;
+      }
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") {
+        setNotifError(s.notificationsDenied);
+        await setNotificationsEnabled({ enabled: false });
+        return;
+      }
+
+      const reg = await navigator.serviceWorker.ready;
+      if (!reg.pushManager) {
+        setNotifError(s.notificationsUnsupported);
+        await setNotificationsEnabled({ enabled: false });
+        return;
+      }
+
+      const vapid = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!vapid) {
+        setNotifError("Missing NEXT_PUBLIC_VAPID_PUBLIC_KEY");
+        return;
+      }
+
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapid),
+      });
+      await upsertSubscription({
+        subscription: sub.toJSON() as {
+          endpoint: string;
+          expirationTime?: number | null;
+          keys: { p256dh: string; auth: string };
+        },
+        userAgent: navigator.userAgent,
+      });
+      await setNotificationsEnabled({ enabled: true });
+    } finally {
+      setNotifBusy(false);
+    }
+  }
+
+  async function disableNotifications() {
+    if (typeof window === "undefined") return;
+    setNotifError(null);
+    setNotifBusy(true);
+    try {
+      if ("serviceWorker" in navigator) {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          const json = sub.toJSON() as { endpoint: string };
+          await sub.unsubscribe();
+          if (json.endpoint) {
+            await removeSubscription({ endpoint: json.endpoint });
+          }
+        }
+      }
+      await setNotificationsEnabled({ enabled: false });
+    } finally {
+      setNotifBusy(false);
+    }
+  }
 
   async function onSaveProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -207,6 +295,36 @@ export default function SettingsPage() {
 
       <SettingsSection title={s.preferences}>
         <div className="space-y-8">
+          <div>
+            <p className="capsule-label mb-2">{s.notifications}</p>
+            <p className="text-sm text-capsule-text-muted">{s.notificationsHint}</p>
+            {notifError ? (
+              <p className="mt-2 text-sm text-[color:var(--capsule-danger)]" role="alert">
+                {notifError}
+              </p>
+            ) : null}
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={cn(
+                  "capsule-btn-primary min-w-[200px]",
+                  notificationsEnabled && "opacity-70",
+                )}
+                disabled={notifBusy || notificationsEnabled}
+                onClick={() => void enableNotifications()}
+              >
+                {notifBusy ? t.common.loading : s.notificationsEnable}
+              </button>
+              <button
+                type="button"
+                className="capsule-btn-secondary min-w-[200px]"
+                disabled={notifBusy || !notificationsEnabled}
+                onClick={() => void disableNotifications()}
+              >
+                {notifBusy ? t.common.loading : s.notificationsDisable}
+              </button>
+            </div>
+          </div>
           <div>
             <p className="capsule-label mb-3">{s.language}</p>
             <div className="inline-flex flex-wrap gap-1 rounded-[var(--radius-md)] border border-[color:rgba(110,135,141,0.35)] bg-white/40 p-1">

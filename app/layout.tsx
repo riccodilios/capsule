@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Tajawal } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
@@ -25,7 +25,6 @@ export const metadata: Metadata = {
   description:
     "Track medications, smart alerts, and adherence with clarity and trust.",
   manifest: "/manifest.webmanifest",
-  themeColor: "#5d99a6",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -36,6 +35,10 @@ export const metadata: Metadata = {
     shortcut: "/capsule-icon.png",
     apple: "/apple-touch-icon.png",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#5d99a6",
 };
 
 export default function RootLayout({

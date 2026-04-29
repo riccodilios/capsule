@@ -25,9 +25,16 @@ export default defineSchema({
     onboardingCompletedAt: v.optional(v.number()),
     /** When false, interruptive medication alarm modal is suppressed. */
     alertsEnabled: v.optional(v.boolean()),
+    /** When true, web push notifications are enabled (PWA). */
+    notificationsEnabled: v.optional(v.boolean()),
     /** Default snooze length for quick actions (5–30). */
     defaultSnoozeMinutes: v.optional(v.number()),
-  }).index("by_user", ["userId"]),
+  })
+    .index("by_user", ["userId"])
+    .index("by_notificationsEnabled_and_userId", [
+      "notificationsEnabled",
+      "userId",
+    ]),
 
   medications: defineTable({
     userId: v.string(),
@@ -83,4 +90,26 @@ export default defineSchema({
     /** Bumped when chart rules change; stale rows are recomputed from logs. */
     schemaVersion: v.optional(v.number()),
   }).index("by_user_month", ["userId", "monthKey"]),
+
+  /** Web push subscriptions per user device/browser. */
+  pushSubscriptions: defineTable({
+    userId: v.string(),
+    endpoint: v.string(),
+    p256dh: v.string(),
+    auth: v.string(),
+    expirationTime: v.optional(v.number()),
+    userAgent: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_endpoint", ["endpoint"]),
+
+  /** De-dupe ledger so we send at most one push per (user, med, scheduledFor). */
+  pushNotificationsSent: defineTable({
+    userId: v.string(),
+    medicationId: v.id("medications"),
+    scheduledFor: v.number(),
+    sentAt: v.number(),
+  }).index("by_lookup", ["userId", "medicationId", "scheduledFor"]),
 });

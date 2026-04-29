@@ -40,6 +40,9 @@ export default function DashboardPage() {
   }, [settings?.timeZone, nowMs]);
 
   const summary = useQuery(api.dashboard.getDay, { dayISO });
+  const markTaken = useMutation(api.adherence.markTaken);
+  const markMissed = useMutation(api.adherence.markMissed);
+  const snooze = useMutation(api.adherence.snooze);
   const finalizePastMonthSnapshots = useMutation(
     api.dashboard.finalizePastMonthSnapshots,
   );
@@ -55,6 +58,41 @@ export default function DashboardPage() {
       /* Backend may be behind local code until `npx convex dev` / deploy syncs. */
     });
   }, [dayISO, finalizePastMonthSnapshots, nowMs, settings]);
+
+  // Handle deep-link actions coming from push notification buttons.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("notif") !== "1") return;
+    const action = url.searchParams.get("action");
+    const medicationId = url.searchParams.get("medicationId");
+    const scheduledForRaw = url.searchParams.get("scheduledFor");
+    const scheduledFor = scheduledForRaw ? Number(scheduledForRaw) : NaN;
+    if (!action || !medicationId || !Number.isFinite(scheduledFor)) return;
+
+    (async () => {
+      try {
+        if (action === "taken") {
+          await markTaken({ medicationId: medicationId as any, scheduledFor });
+        } else if (action === "missed") {
+          await markMissed({ medicationId: medicationId as any, scheduledFor });
+        } else if (action === "snooze15") {
+          await snooze({
+            medicationId: medicationId as any,
+            scheduledFor,
+            minutes: 15,
+          });
+        }
+      } finally {
+        url.searchParams.delete("notif");
+        url.searchParams.delete("action");
+        url.searchParams.delete("medicationId");
+        url.searchParams.delete("scheduledFor");
+        window.history.replaceState({}, "", url.pathname + url.search);
+        setNowMs(Date.now());
+      }
+    })();
+  }, [markTaken, markMissed, snooze]);
 
   /** Due "pending" first; then catch-up for past times today with no log (e.g. open app at 7pm for 5pm dose). */
   const alarmSlot = useMemo((): AlarmSlot | null => {
