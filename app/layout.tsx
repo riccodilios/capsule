@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Tajawal } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import { PwaRegister } from "@/components/pwa-register";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,10 +24,17 @@ export const metadata: Metadata = {
   title: "Capsule — Medication adherence",
   description:
     "Track medications, smart alerts, and adherence with clarity and trust.",
+  manifest: "/manifest.webmanifest",
+  themeColor: "#5d99a6",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Capsule",
+  },
   icons: {
     icon: [{ url: "/capsule-icon.png", type: "image/png" }],
     shortcut: "/capsule-icon.png",
-    apple: "/capsule-icon.png",
+    apple: "/apple-touch-icon.png",
   },
 };
 
@@ -42,7 +50,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="flex min-h-dvh flex-col font-sans text-capsule-text antialiased">
-        <Providers>{children}</Providers>
+        <Providers>
+          <PwaRegister />
+          {children}
+        </Providers>
       </body>
     </html>
   );
