@@ -18,6 +18,7 @@ import {
   type PastDoseStep,
 } from "@/components/medications/past-doses-today-modal";
 import { cn } from "@/lib/cn";
+import type { Id } from "@/convex/_generated/dataModel";
 
 type Mode = "add" | "edit";
 
@@ -95,18 +96,44 @@ export function MedicationEditorModal({
     setError(null);
     try {
       const payload = draftToApi(draft, timeZone);
+      const normalize = (
+        r:
+          | string
+          | {
+              medicationId: Id<"medications">;
+              pastDosesToConfirm: { scheduledFor: number }[];
+            }
+          | null
+          | undefined,
+      ): {
+        medicationId: Id<"medications"> | null;
+        pastDosesToConfirm: { scheduledFor: number }[];
+      } => {
+        if (!r) return { medicationId: null, pastDosesToConfirm: [] };
+        if (typeof r === "string") {
+          return { medicationId: r as Id<"medications">, pastDosesToConfirm: [] };
+        }
+        return {
+          medicationId: r.medicationId,
+          pastDosesToConfirm: Array.isArray(r.pastDosesToConfirm)
+            ? r.pastDosesToConfirm
+            : [],
+        };
+      };
       if (mode === "add") {
-        const r = await create({
+        const rr = await create({
           name: payload.name,
           dosage: payload.dosage,
           reminderTimes: payload.reminderTimes,
           schedule: payload.schedule,
           duration: payload.duration,
         });
-        if (r.pastDosesToConfirm.length > 0) {
+        const r = normalize(rr);
+        if (r.medicationId && r.pastDosesToConfirm.length > 0) {
+          const medId = r.medicationId;
           setPastSteps(
             r.pastDosesToConfirm.map((s) => ({
-              medicationId: r.medicationId,
+              medicationId: medId,
               medicationName: payload.name,
               scheduledFor: s.scheduledFor,
             })),
@@ -114,7 +141,7 @@ export function MedicationEditorModal({
           return;
         }
       } else if (initialMed) {
-        const r = await update({
+        const rr = await update({
           id: initialMed._id,
           name: payload.name,
           dosage: payload.dosage,
@@ -122,10 +149,12 @@ export function MedicationEditorModal({
           schedule: payload.schedule,
           duration: payload.duration,
         });
-        if (r.pastDosesToConfirm.length > 0) {
+        const r = normalize(rr as any);
+        if (r.medicationId && r.pastDosesToConfirm.length > 0) {
+          const medId = r.medicationId;
           setPastSteps(
             r.pastDosesToConfirm.map((s) => ({
-              medicationId: r.medicationId,
+              medicationId: medId,
               medicationName: payload.name,
               scheduledFor: s.scheduledFor,
             })),
