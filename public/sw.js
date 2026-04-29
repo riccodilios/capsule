@@ -60,10 +60,14 @@ self.addEventListener("push", (event) => {
     data = null;
   }
   if (!data) return;
+  console.log("[capsule/sw] push", data);
 
   const actions = Array.isArray(data.actions) ? data.actions : [];
   const scheduledFor = data.scheduledFor;
+  const notifyAt = data.notifyAt;
   const medicationId = data.medicationId;
+  const actionEndpoint = data.actionEndpoint;
+  const actionToken = data.actionToken;
   const baseUrl = "/dashboard";
   const mk = (action) =>
     `${baseUrl}?notif=1&action=${encodeURIComponent(action)}&medicationId=${encodeURIComponent(
@@ -79,6 +83,11 @@ self.addEventListener("push", (event) => {
       actions: actions,
       data: {
         url: baseUrl,
+        actionEndpoint,
+        actionToken,
+        scheduledFor,
+        notifyAt,
+        medicationId,
         actionUrls: {
           taken: mk("taken"),
           missed: mk("missed"),
@@ -93,10 +102,30 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const data = event.notification.data || {};
+  console.log("[capsule/sw] notificationclick", {
+    action: event.action,
+    data,
+  });
+
+  const clicked = event.action;
+
+  // Android/Chrome: handle actions in SW without opening the app.
+  if (clicked && data.actionEndpoint && data.actionToken) {
+    event.waitUntil(
+      fetch(data.actionEndpoint, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: data.actionToken, action: clicked }),
+      })
+        .then(() => undefined)
+        .catch((err) => console.log("[capsule/sw] action post failed", err)),
+    );
+    return;
+  }
+
+  // iOS / fallback: open/focus the app to handle the action via deep link.
   const url =
-    (event.action && data.actionUrls && data.actionUrls[event.action]) ||
-    data.url ||
-    "/dashboard";
+    (clicked && data.actionUrls && data.actionUrls[clicked]) || data.url || "/dashboard";
   event.waitUntil(self.clients.openWindow(url));
 });
 

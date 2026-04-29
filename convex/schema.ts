@@ -112,4 +112,25 @@ export default defineSchema({
     scheduledFor: v.number(),
     sentAt: v.number(),
   }).index("by_lookup", ["userId", "medicationId", "scheduledFor"]),
+
+  /** De-dupe ledger per notification instant (supports snooze follow-ups). */
+  pushNotificationsSentV2: defineTable({
+    userId: v.string(),
+    medicationId: v.id("medications"),
+    scheduledFor: v.number(),
+    notifyAt: v.number(),
+    sentAt: v.number(),
+  }).index("by_lookup", ["userId", "medicationId", "notifyAt"]),
+
+  /** One-time tokens for service-worker action POSTs. */
+  pushActionTokens: defineTable({
+    token: v.string(),
+    userId: v.string(),
+    medicationId: v.id("medications"),
+    scheduledFor: v.number(),
+    notifyAt: v.number(),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+    usedAt: v.optional(v.number()),
+  }).index("by_token", ["token"]),
 });

@@ -117,7 +117,10 @@ export type DuePush = {
     icon: string;
     badge: string;
     scheduledFor: number;
+    notifyAt: number;
     medicationId: string;
+    actionEndpoint: string;
+    actionToken: string;
     actions: { action: "taken" | "missed" | "snooze15"; title: string }[];
   };
 };
@@ -129,24 +132,150 @@ export const markPushSent = internalMutation({
     userId: v.string(),
     medicationId: v.id("medications"),
     scheduledFor: v.number(),
+    notifyAt: v.number(),
   },
-  handler: async (ctx, { userId, medicationId, scheduledFor }) => {
+  handler: async (ctx, { userId, medicationId, scheduledFor, notifyAt }) => {
     const existing = await ctx.db
-      .query("pushNotificationsSent")
+      .query("pushNotificationsSentV2")
       .withIndex("by_lookup", (q) =>
         q
           .eq("userId", userId)
           .eq("medicationId", medicationId)
-          .eq("scheduledFor", scheduledFor),
+          .eq("notifyAt", notifyAt),
       )
       .unique();
     if (existing) return null;
-    await ctx.db.insert("pushNotificationsSent", {
+    await ctx.db.insert("pushNotificationsSentV2", {
       userId,
       medicationId,
       scheduledFor,
+      notifyAt,
       sentAt: Date.now(),
     });
+    return null;
+  },
+});
+
+export const createActionToken = internalMutation({
+  args: {
+    userId: v.string(),
+    medicationId: v.id("medications"),
+    scheduledFor: v.number(),
+    notifyAt: v.number(),
+    expiresAt: v.number(),
+  },
+  handler: async (ctx, args): Promise<string> => {
+    const token =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? (crypto as any).randomUUID()
+        : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    await ctx.db.insert("pushActionTokens", {
+      token,
+      userId: args.userId,
+      medicationId: args.medicationId,
+      scheduledFor: args.scheduledFor,
+      notifyAt: args.notifyAt,
+      expiresAt: args.expiresAt,
+      createdAt: Date.now(),
+    });
+    return token;
+  },
+});
+
+export const applyActionToken = internalMutation({
+  args: {
+    token: v.string(),
+    action: v.union(v.literal("taken"), v.literal("missed"), v.literal("snooze15")),
+  },
+  handler: async (ctx, { token, action }) => {
+    const row = await ctx.db
+      .query("pushActionTokens")
+      .withIndex("by_token", (q) => q.eq("token", token))
+      .unique();
+    if (!row) throw new Error("Invalid token");
+    const now = Date.now();
+    if (row.usedAt != null) throw new Error("Token used");
+    if (row.expiresAt < now) throw new Error("Expired");
+
+    const med = await ctx.db.get(row.medicationId);
+    if (!med || med.userId !== row.userId) throw new Error("Medication not found");
+
+    const existing = await ctx.db
+      .query("adherenceLogs")
+      .withIndex("by_lookup", (q) =>
+        q
+          .eq("userId", row.userId)
+          .eq("medicationId", row.medicationId)
+          .eq("scheduledFor", row.scheduledFor),
+      )
+      .unique();
+
+    if (action === "taken") {
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          status: "taken_on_time",
+          takenAt: now,
+          snoozeUntil: undefined,
+          updatedAt: now,
+          wasSnoozed: existing.wasSnoozed ?? false,
+        });
+      } else {
+        await ctx.db.insert("adherenceLogs", {
+          userId: row.userId,
+          medicationId: row.medicationId,
+          scheduledFor: row.scheduledFor,
+          status: "taken_on_time",
+          takenAt: now,
+          updatedAt: now,
+        });
+      }
+    } else if (action === "missed") {
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          status: "missed",
+          snoozeUntil: undefined,
+          updatedAt: now,
+          wasSnoozed: existing.wasSnoozed ?? false,
+        });
+      } else {
+        await ctx.db.insert("adherenceLogs", {
+          userId: row.userId,
+          medicationId: row.medicationId,
+          scheduledFor: row.scheduledFor,
+          status: "missed",
+          updatedAt: now,
+        });
+      }
+    } else {
+      const minutes = 15;
+      const snoozeUntil = now + minutes * 60 * 1000;
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          status: "snoozed",
+          snoozeUntil,
+          snoozedNextDueAt: snoozeUntil,
+          snoozeMinutes: minutes,
+          wasSnoozed: true,
+          ...(existing.snoozedAt == null ? { snoozedAt: now } : {}),
+          updatedAt: now,
+        });
+      } else {
+        await ctx.db.insert("adherenceLogs", {
+          userId: row.userId,
+          medicationId: row.medicationId,
+          scheduledFor: row.scheduledFor,
+          status: "snoozed",
+          snoozeUntil,
+          snoozedNextDueAt: snoozeUntil,
+          snoozeMinutes: minutes,
+          snoozedAt: now,
+          wasSnoozed: true,
+          updatedAt: now,
+        });
+      }
+    }
+
+    await ctx.db.patch(row._id, { usedAt: now });
     return null;
   },
 });
@@ -203,20 +332,26 @@ export const listDuePushes = internalMutation({
       });
 
       for (const s of slots) {
-        // Only send close to scheduled time (within window), and only if still pending.
-        if (s.scheduledFor > now) continue;
-        if (now - s.scheduledFor > SEND_WINDOW_MS) continue;
+        // Determine when to notify: original scheduled time or snoozed due time.
+        const notifyAt =
+          s.log?.status === "snoozed" && typeof s.log.snoozedNextDueAt === "number"
+            ? s.log.snoozedNextDueAt
+            : s.scheduledFor;
+
+        // Only send close to notifyAt (within window), and only if still pending.
+        if (notifyAt > now) continue;
+        if (now - notifyAt > SEND_WINDOW_MS) continue;
 
         const effective = getEffectiveStatus(s.log, now, s.scheduledFor);
         if (effective !== "pending") continue;
 
         const already = await ctx.db
-          .query("pushNotificationsSent")
+          .query("pushNotificationsSentV2")
           .withIndex("by_lookup", (q) =>
             q
               .eq("userId", userId)
               .eq("medicationId", s.medicationId as Id<"medications">)
-              .eq("scheduledFor", s.scheduledFor),
+              .eq("notifyAt", notifyAt),
           )
           .unique();
         if (already) continue;
@@ -227,6 +362,20 @@ export const listDuePushes = internalMutation({
           locale === "ar"
             ? `${s.medicationName} • ${hhmm}`
             : `${s.medicationName} • ${hhmm}`;
+
+        const actionToken =
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? (crypto as any).randomUUID()
+            : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        await ctx.db.insert("pushActionTokens", {
+          token: actionToken,
+          userId,
+          medicationId: s.medicationId as Id<"medications">,
+          scheduledFor: s.scheduledFor,
+          notifyAt,
+          expiresAt: now + 30 * 60 * 1000,
+          createdAt: now,
+        });
 
         out.push({
           userId,
@@ -241,7 +390,10 @@ export const listDuePushes = internalMutation({
             icon: "/icons/icon-192.png",
             badge: "/icons/icon-192.png",
             scheduledFor: s.scheduledFor,
+            notifyAt,
             medicationId: String(s.medicationId),
+            actionEndpoint: "/push/action",
+            actionToken: actionToken as any,
             actions:
               locale === "ar"
                 ? [

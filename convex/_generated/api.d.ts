@@ -11,6 +11,7 @@
 import type * as adherence from "../adherence.js";
 import type * as crons from "../crons.js";
 import type * as dashboard from "../dashboard.js";
+import type * as http from "../http.js";
 import type * as lib_chartAnchor from "../lib/chartAnchor.js";
 import type * as lib_monthlyAggregation from "../lib/monthlyAggregation.js";
 import type * as lib_monthlyChartWindow from "../lib/monthlyChartWindow.js";
@@ -35,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   adherence: typeof adherence;
   crons: typeof crons;
   dashboard: typeof dashboard;
+  http: typeof http;
   "lib/chartAnchor": typeof lib_chartAnchor;
   "lib/monthlyAggregation": typeof lib_monthlyAggregation;
   "lib/monthlyChartWindow": typeof lib_monthlyChartWindow;

@@ -36,6 +36,7 @@ export const sendDueNotifications = internalAction({
           userId: item.userId,
           medicationId: item.payload.medicationId as any,
           scheduledFor: item.payload.scheduledFor,
+          notifyAt: item.payload.notifyAt,
         });
       } catch (err: any) {
         const code = err?.statusCode;
