@@ -303,26 +303,38 @@ export default function SettingsPage() {
                 {notifError}
               </p>
             ) : null}
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                className={cn(
-                  "capsule-btn-primary min-w-[200px]",
-                  notificationsEnabled && "opacity-70",
-                )}
-                disabled={notifBusy || notificationsEnabled}
-                onClick={() => void enableNotifications()}
-              >
-                {notifBusy ? t.common.loading : s.notificationsEnable}
-              </button>
-              <button
-                type="button"
-                className="capsule-btn-secondary min-w-[200px]"
-                disabled={notifBusy || !notificationsEnabled}
-                onClick={() => void disableNotifications()}
-              >
-                {notifBusy ? t.common.loading : s.notificationsDisable}
-              </button>
+            <div className="mt-4 flex items-center justify-between gap-4 rounded-[var(--radius-md)] border border-[color:rgba(110,135,141,0.2)] bg-white/40 px-4 py-4">
+              <div>
+                <p className="text-sm font-medium text-capsule-text">
+                  {notificationsEnabled ? s.notificationsDisable : s.notificationsEnable}
+                </p>
+              </div>
+              <label className="relative inline-flex cursor-pointer items-center">
+                <input
+                  type="checkbox"
+                  className="peer sr-only"
+                  checked={notificationsEnabled}
+                  disabled={notifBusy}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    if (next) void enableNotifications();
+                    else void disableNotifications();
+                  }}
+                />
+                <span
+                  className={cn(
+                    "h-7 w-12 rounded-full border transition",
+                    "border-[color:rgba(110,135,141,0.35)] bg-white/60 peer-checked:bg-[var(--capsule-primary)]",
+                    notifBusy && "opacity-60",
+                  )}
+                />
+                <span
+                  className={cn(
+                    "absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow transition",
+                    "peer-checked:translate-x-5",
+                  )}
+                />
+              </label>
             </div>
           </div>
           <div>
