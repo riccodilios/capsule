@@ -319,7 +319,7 @@ export default function SettingsPage() {
               <label className="relative inline-flex cursor-pointer items-center">
                 <input
                   type="checkbox"
-                  className="peer sr-only"
+                  className="sr-only"
                   checked={notifEnabledUi}
                   disabled={notifBusy}
                   onChange={(e) => {
@@ -339,15 +339,18 @@ export default function SettingsPage() {
                 <span
                   className={cn(
                     "h-7 w-12 rounded-full border transition",
-                    "border-[color:rgba(110,135,141,0.35)] bg-white/60 peer-checked:bg-[var(--capsule-primary)]",
+                    "border-[color:rgba(110,135,141,0.35)]",
+                    notifEnabledUi ? "bg-[var(--capsule-primary)]" : "bg-white/60",
                     notifBusy && "opacity-60",
                   )}
                 />
                 <span
                   className={cn(
                     "absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow transition",
-                    "peer-checked:translate-x-5",
                   )}
+                  style={{
+                    transform: notifEnabledUi ? "translateX(20px)" : "translateX(0px)",
+                  }}
                 />
               </label>
             </div>
